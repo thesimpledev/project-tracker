@@ -31,6 +31,7 @@ const (
 	StateNormal State = iota
 	StateFocused
 	StateAdding
+	StateEditing
 )
 
 type Module struct {
@@ -45,6 +46,7 @@ type Module struct {
 	err         error
 	scrollPos   int
 	inputBuffer string
+	editingLine int
 }
 
 type TodoLoadedMsg struct {
@@ -213,6 +215,37 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 			return m, nil
 		}
 
+		// Handle editing state
+		if m.state == StateEditing {
+			switch msg.String() {
+			case "esc":
+				// Save edit and return to focused
+				if m.editingLine < len(m.items) {
+					m.items[m.editingLine].Text = m.inputBuffer
+					m.saveTodo()
+				}
+				m.state = StateFocused
+				m.inputBuffer = ""
+			case "enter":
+				// Save edit and return to focused
+				if m.editingLine < len(m.items) {
+					m.items[m.editingLine].Text = m.inputBuffer
+					m.saveTodo()
+				}
+				m.state = StateFocused
+				m.inputBuffer = ""
+			case "backspace":
+				if len(m.inputBuffer) > 0 {
+					m.inputBuffer = m.inputBuffer[:len(m.inputBuffer)-1]
+				}
+			default:
+				if len(msg.String()) == 1 {
+					m.inputBuffer += msg.String()
+				}
+			}
+			return m, nil
+		}
+
 		if m.state != StateFocused {
 			return m, nil
 		}
@@ -237,6 +270,12 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 		case "a": // Add new item
 			m.state = StateAdding
 			m.inputBuffer = ""
+		case "i": // Edit current item
+			if m.cursor < len(m.items) {
+				m.state = StateEditing
+				m.editingLine = m.cursor
+				m.inputBuffer = m.items[m.cursor].Text
+			}
 		case "d", "x": // Delete item
 			if m.cursor < len(m.items) {
 				m.items = append(m.items[:m.cursor], m.items[m.cursor+1:]...)
@@ -321,7 +360,7 @@ func (m *Module) View() string {
 	var borderStyle lipgloss.Border
 
 	switch m.state {
-	case StateFocused, StateAdding:
+	case StateFocused, StateAdding, StateEditing:
 		borderColor = lipgloss.Color("62") // Purple for focused
 		borderStyle = lipgloss.ThickBorder()
 	default:
@@ -373,6 +412,18 @@ func (m *Module) renderContent() string {
 		b.WriteString(inputStyle.Render("> [ ] "+m.inputBuffer+"█") + "\n")
 		hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 		b.WriteString(hintStyle.Render("  enter: save  esc: cancel") + "\n")
+	}
+
+	// Show input field when editing
+	if m.state == StateEditing && m.editingLine < len(m.items) {
+		inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+		checkbox := "[ ]"
+		if m.items[m.editingLine].Checked {
+			checkbox = "[x]"
+		}
+		b.WriteString(inputStyle.Render("> "+checkbox+" "+m.inputBuffer+"█") + "\n")
+		hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+		b.WriteString(hintStyle.Render("  enter/esc: save") + "\n")
 	}
 
 	// Error state
