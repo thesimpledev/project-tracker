@@ -1,8 +1,8 @@
 package placeholder
 
 import (
-	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/thesimpledev/project-tracker/internal/modules"
 )
 
@@ -84,4 +84,9 @@ func (m *Module) SetFocused(focused bool) modules.Module {
 
 func (m *Module) IsFocused() bool {
 	return m.focused
+}
+
+// GetCopyContent returns empty string for placeholder
+func (m *Module) GetCopyContent() string {
+	return ""
 }

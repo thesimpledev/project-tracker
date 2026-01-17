@@ -214,8 +214,8 @@ func (m *Module) View() string {
 	style := lipgloss.NewStyle().
 		Border(borderStyle).
 		BorderForeground(borderColor).
-		Width(m.width - 2).
-		Height(m.height - 2).
+		Width(m.width-2).
+		Height(m.height-2).
 		Padding(0, 1)
 
 	var content string
@@ -518,4 +518,26 @@ func (m *Module) SetFocused(focused bool) modules.Module {
 
 func (m *Module) IsFocused() bool {
 	return m.focused
+}
+
+// GetCopyContent returns CI status info for clipboard copying
+func (m *Module) GetCopyContent() string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("Repository: %s/%s\n", m.repo.Owner, m.repo.Name))
+	b.WriteString(fmt.Sprintf("Status: %s\n\n", m.status))
+	b.WriteString("Recent Runs:\n")
+	for _, run := range m.runs {
+		status := "?"
+		switch run.Conclusion {
+		case "success":
+			status = "✓"
+		case "failure":
+			status = "✗"
+		}
+		if run.Status == "in_progress" {
+			status = "⟳"
+		}
+		b.WriteString(fmt.Sprintf("  %s %s (%s) - %s\n", status, run.Name, run.HeadBranch, run.UpdatedAt.Format("Jan 2 15:04")))
+	}
+	return b.String()
 }

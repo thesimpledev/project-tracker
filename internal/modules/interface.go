@@ -14,6 +14,12 @@ type Module interface {
 	IsFocused() bool
 }
 
+// Copyable is an optional interface modules can implement to support
+// copying their content to clipboard with the 'yy' command
+type Copyable interface {
+	GetCopyContent() string
+}
+
 type ModuleFactory func() Module
 
 var registry = map[string]ModuleFactory{}

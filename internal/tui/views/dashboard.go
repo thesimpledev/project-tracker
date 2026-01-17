@@ -9,6 +9,7 @@ import (
 
 	"github.com/thesimpledev/project-tracker/internal/config"
 	"github.com/thesimpledev/project-tracker/internal/modules"
+	"github.com/thesimpledev/project-tracker/internal/modules/test_runner"
 	"github.com/thesimpledev/project-tracker/internal/repo"
 	"github.com/thesimpledev/project-tracker/internal/tui/components"
 )
@@ -21,14 +22,16 @@ const (
 )
 
 type DashboardModel struct {
-	config       *config.Config
-	grid         components.Grid
-	commandInput components.CommandInput
-	mode         InputMode
-	width        int
-	height       int
-	err          error
-	profileName  string
+	config        *config.Config
+	grid          components.Grid
+	commandInput  components.CommandInput
+	mode          InputMode
+	width         int
+	height        int
+	err           error
+	profileName   string
+	statusMessage string
+	statusTime    time.Time
 }
 
 type RefreshMsg struct{}
@@ -97,6 +100,14 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 				m.commandInput = m.commandInput.SetFocused(false)
 				return m, nil
 			}
+		case "t":
+			// Global 't' to trigger tests from anywhere in grid mode
+			if m.mode == ModeGrid && m.grid.State == components.GridNavigating {
+				// Broadcast test run message to all modules
+				var cmd tea.Cmd
+				m.grid, cmd = m.grid.Update(test_runner.TriggerTestRun())
+				return m, cmd
+			}
 		}
 
 	case components.ExecuteCommandMsg:
@@ -105,6 +116,15 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 	case RefreshMsg:
 		cmds = append(cmds, m.grid.RefreshAll())
 		return m, tea.Batch(cmds...)
+
+	case components.ClipboardCopyMsg:
+		if msg.Success {
+			m.statusMessage = "Copied to clipboard!"
+		} else {
+			m.statusMessage = "Failed to copy"
+		}
+		m.statusTime = time.Now()
+		return m, nil
 	}
 
 	switch m.mode {
@@ -241,35 +261,48 @@ func buildModulesFromConfig(cfg *config.Config) []modules.Module {
 	var mods []modules.Module
 
 	// Add modules for each repo
-	// Layout: Row 1: CI, TODO, placeholder | Row 2: Git Status, placeholder, placeholder
+	// Layout: Row 1: CI, TODO, Notes | Row 2: Git Status, placeholder, Tests
 	for _, r := range cfg.Repos {
-		// Row 1: CI status module
+		// Row 1: CI status module (top left)
 		ciMod := modules.Create("ci_status")
 		if ciMod == nil {
 			ciMod = modules.Create("placeholder")
 		}
 		if ciMod != nil {
-			if setter, ok := ciMod.(interface{ SetRepo(config.Repo) modules.Module }); ok {
+			if setter, ok := ciMod.(interface {
+				SetRepo(config.Repo) modules.Module
+			}); ok {
 				ciMod = setter.SetRepo(r)
 			}
 			mods = append(mods, ciMod)
 		}
 
-		// Row 1: TODO module
+		// Row 1: TODO module (top middle)
 		todoMod := modules.Create("todo")
 		if todoMod == nil {
 			todoMod = modules.Create("placeholder")
 		}
 		if todoMod != nil {
-			if setter, ok := todoMod.(interface{ SetRepo(config.Repo) modules.Module }); ok {
+			if setter, ok := todoMod.(interface {
+				SetRepo(config.Repo) modules.Module
+			}); ok {
 				todoMod = setter.SetRepo(r)
 			}
 			mods = append(mods, todoMod)
 		}
 
-		// Row 1: Placeholder (top right)
-		if placeholder := modules.Create("placeholder"); placeholder != nil {
-			mods = append(mods, placeholder)
+		// Row 1: Notes module (top right)
+		notesMod := modules.Create("notes")
+		if notesMod == nil {
+			notesMod = modules.Create("placeholder")
+		}
+		if notesMod != nil {
+			if setter, ok := notesMod.(interface {
+				SetRepo(config.Repo) modules.Module
+			}); ok {
+				notesMod = setter.SetRepo(r)
+			}
+			mods = append(mods, notesMod)
 		}
 
 		// Row 2: Git status module (lower left)
@@ -278,10 +311,31 @@ func buildModulesFromConfig(cfg *config.Config) []modules.Module {
 			gitMod = modules.Create("placeholder")
 		}
 		if gitMod != nil {
-			if setter, ok := gitMod.(interface{ SetRepo(config.Repo) modules.Module }); ok {
+			if setter, ok := gitMod.(interface {
+				SetRepo(config.Repo) modules.Module
+			}); ok {
 				gitMod = setter.SetRepo(r)
 			}
 			mods = append(mods, gitMod)
+		}
+
+		// Row 2: Placeholder (lower middle)
+		if placeholder := modules.Create("placeholder"); placeholder != nil {
+			mods = append(mods, placeholder)
+		}
+
+		// Row 2: Test runner module (lower right)
+		testMod := modules.Create("test_runner")
+		if testMod == nil {
+			testMod = modules.Create("placeholder")
+		}
+		if testMod != nil {
+			if setter, ok := testMod.(interface {
+				SetRepo(config.Repo) modules.Module
+			}); ok {
+				testMod = setter.SetRepo(r)
+			}
+			mods = append(mods, testMod)
 		}
 	}
 
@@ -313,6 +367,14 @@ func (m DashboardModel) View() string {
 			Foreground(lipgloss.Color("212")).
 			Bold(true)
 		titleText = "project-tracker - " + profileStyle.Render(m.profileName)
+	}
+
+	// Show status message if recent (within 2 seconds)
+	if m.statusMessage != "" && time.Since(m.statusTime) < 2*time.Second {
+		statusStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42")).
+			Bold(true)
+		titleText += " " + statusStyle.Render("["+m.statusMessage+"]")
 	}
 	title := titleStyle.Render(titleText)
 

@@ -2,12 +2,20 @@ package components
 
 import (
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/thesimpledev/project-tracker/internal/clipboard"
 	"github.com/thesimpledev/project-tracker/internal/modules"
 )
+
+// ClipboardCopyMsg is sent when content is copied to clipboard
+type ClipboardCopyMsg struct {
+	Success bool
+	Error   error
+}
 
 const (
 	GridCols = 3
@@ -22,11 +30,12 @@ const (
 )
 
 type Grid struct {
-	Modules []modules.Module
-	Cursor  int
-	State   GridState
-	Width   int
-	Height  int
+	Modules    []modules.Module
+	Cursor     int
+	State      GridState
+	Width      int
+	Height     int
+	lastYPress time.Time // For detecting 'yy' sequence
 }
 
 func NewGrid(mods []modules.Module) Grid {
@@ -99,6 +108,26 @@ func (g Grid) Update(msg tea.Msg) (Grid, tea.Cmd) {
 			if g.Cursor < len(g.Modules) {
 				g.State = GridModuleFocused
 				g.Modules[g.Cursor] = g.Modules[g.Cursor].SetFocused(true)
+			}
+		case "y":
+			// Check for 'yy' sequence (two y presses within 500ms)
+			now := time.Now()
+			if now.Sub(g.lastYPress) < 500*time.Millisecond {
+				// yy detected - copy module content to clipboard
+				if g.Cursor < len(g.Modules) {
+					if copyable, ok := g.Modules[g.Cursor].(modules.Copyable); ok {
+						content := copyable.GetCopyContent()
+						if content != "" {
+							err := clipboard.Copy(content)
+							cmds = append(cmds, func() tea.Msg {
+								return ClipboardCopyMsg{Success: err == nil, Error: err}
+							})
+						}
+					}
+				}
+				g.lastYPress = time.Time{} // Reset
+			} else {
+				g.lastYPress = now
 			}
 		}
 
@@ -202,8 +231,8 @@ func (g Grid) View() string {
 				emptyStyle := lipgloss.NewStyle().
 					Border(lipgloss.RoundedBorder()).
 					BorderForeground(lipgloss.Color("236")).
-					Width(moduleWidth - 2).
-					Height(moduleHeight - 2).
+					Width(moduleWidth-2).
+					Height(moduleHeight-2).
 					Align(lipgloss.Center, lipgloss.Center).
 					Foreground(lipgloss.Color("241"))
 				rowModules = append(rowModules, emptyStyle.Render(""))

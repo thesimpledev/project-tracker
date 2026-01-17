@@ -13,7 +13,9 @@ import (
 	// Register modules
 	_ "github.com/thesimpledev/project-tracker/internal/modules/ci_status"
 	_ "github.com/thesimpledev/project-tracker/internal/modules/git_status"
+	_ "github.com/thesimpledev/project-tracker/internal/modules/notes"
 	_ "github.com/thesimpledev/project-tracker/internal/modules/placeholder"
+	_ "github.com/thesimpledev/project-tracker/internal/modules/test_runner"
 	_ "github.com/thesimpledev/project-tracker/internal/modules/todo"
 )
 

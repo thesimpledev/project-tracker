@@ -54,35 +54,48 @@ func buildModules(cfg *config.Config) []modules.Module {
 	var mods []modules.Module
 
 	// Add modules for each repo
-	// Layout: Row 1: CI, TODO, placeholder | Row 2: Git Status, placeholder, placeholder
+	// Layout: Row 1: CI, TODO, Notes | Row 2: Git Status, placeholder, Tests
 	for _, r := range cfg.Repos {
-		// Row 1: CI status module
+		// Row 1: CI status module (top left)
 		ciMod := modules.Create("ci_status")
 		if ciMod == nil {
 			ciMod = modules.Create("placeholder")
 		}
 		if ciMod != nil {
-			if setter, ok := ciMod.(interface{ SetRepo(config.Repo) modules.Module }); ok {
+			if setter, ok := ciMod.(interface {
+				SetRepo(config.Repo) modules.Module
+			}); ok {
 				ciMod = setter.SetRepo(r)
 			}
 			mods = append(mods, ciMod)
 		}
 
-		// Row 1: TODO module
+		// Row 1: TODO module (top middle)
 		todoMod := modules.Create("todo")
 		if todoMod == nil {
 			todoMod = modules.Create("placeholder")
 		}
 		if todoMod != nil {
-			if setter, ok := todoMod.(interface{ SetRepo(config.Repo) modules.Module }); ok {
+			if setter, ok := todoMod.(interface {
+				SetRepo(config.Repo) modules.Module
+			}); ok {
 				todoMod = setter.SetRepo(r)
 			}
 			mods = append(mods, todoMod)
 		}
 
-		// Row 1: Placeholder (top right)
-		if placeholder := modules.Create("placeholder"); placeholder != nil {
-			mods = append(mods, placeholder)
+		// Row 1: Notes module (top right)
+		notesMod := modules.Create("notes")
+		if notesMod == nil {
+			notesMod = modules.Create("placeholder")
+		}
+		if notesMod != nil {
+			if setter, ok := notesMod.(interface {
+				SetRepo(config.Repo) modules.Module
+			}); ok {
+				notesMod = setter.SetRepo(r)
+			}
+			mods = append(mods, notesMod)
 		}
 
 		// Row 2: Git status module (lower left)
@@ -91,10 +104,31 @@ func buildModules(cfg *config.Config) []modules.Module {
 			gitMod = modules.Create("placeholder")
 		}
 		if gitMod != nil {
-			if setter, ok := gitMod.(interface{ SetRepo(config.Repo) modules.Module }); ok {
+			if setter, ok := gitMod.(interface {
+				SetRepo(config.Repo) modules.Module
+			}); ok {
 				gitMod = setter.SetRepo(r)
 			}
 			mods = append(mods, gitMod)
+		}
+
+		// Row 2: Placeholder (lower middle)
+		if placeholder := modules.Create("placeholder"); placeholder != nil {
+			mods = append(mods, placeholder)
+		}
+
+		// Row 2: Test runner module (lower right)
+		testMod := modules.Create("test_runner")
+		if testMod == nil {
+			testMod = modules.Create("placeholder")
+		}
+		if testMod != nil {
+			if setter, ok := testMod.(interface {
+				SetRepo(config.Repo) modules.Module
+			}); ok {
+				testMod = setter.SetRepo(r)
+			}
+			mods = append(mods, testMod)
 		}
 	}
 

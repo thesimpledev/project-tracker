@@ -355,7 +355,7 @@ func (c CommandInput) View() string {
 	inputStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("62")).
-		Width(c.Width - 2).
+		Width(c.Width-2).
 		Padding(0, 1)
 
 	prompt := "> "

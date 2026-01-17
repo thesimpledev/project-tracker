@@ -242,8 +242,8 @@ func (m *Module) View() string {
 	style := lipgloss.NewStyle().
 		Border(borderStyle).
 		BorderForeground(borderColor).
-		Width(m.width - 2).
-		Height(m.height - 2).
+		Width(m.width-2).
+		Height(m.height-2).
 		Padding(0, 1)
 
 	return style.Render(m.renderContent())
@@ -395,4 +395,15 @@ func (m *Module) SetFocused(focused bool) modules.Module {
 
 func (m *Module) IsFocused() bool {
 	return m.focused
+}
+
+// GetCopyContent returns git status info for clipboard copying
+func (m *Module) GetCopyContent() string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("Branch: %s\n", m.branch))
+	b.WriteString(fmt.Sprintf("Staged: %d, Modified: %d, Untracked: %d\n\n", m.staged, m.modified, m.untracked))
+	for _, change := range m.changes {
+		b.WriteString(fmt.Sprintf("%s %s\n", change.Status, change.Path))
+	}
+	return b.String()
 }

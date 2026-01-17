@@ -336,8 +336,8 @@ func (m *Module) View() string {
 	style := lipgloss.NewStyle().
 		Border(borderStyle).
 		BorderForeground(borderColor).
-		Width(m.width - 2).
-		Height(m.height - 2).
+		Width(m.width-2).
+		Height(m.height-2).
 		Padding(0, 1)
 
 	return style.Render(m.renderContent())
@@ -497,4 +497,18 @@ func (m *Module) SetFocused(focused bool) modules.Module {
 
 func (m *Module) IsFocused() bool {
 	return m.focused
+}
+
+// GetCopyContent returns the TODO list for clipboard copying
+func (m *Module) GetCopyContent() string {
+	var b strings.Builder
+	b.WriteString("# TODO\n\n")
+	for _, item := range m.items {
+		if item.Checked {
+			b.WriteString(fmt.Sprintf("- [x] %s\n", item.Text))
+		} else {
+			b.WriteString(fmt.Sprintf("- [ ] %s\n", item.Text))
+		}
+	}
+	return b.String()
 }
