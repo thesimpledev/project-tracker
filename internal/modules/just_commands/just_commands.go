@@ -37,21 +37,22 @@ type JustCommand struct {
 }
 
 type Module struct {
-	repo       config.Repo
-	commands   []JustCommand
-	cursor     int
-	scrollPos  int
-	state      State
-	selected   bool
-	focused    bool
-	width      int
-	height     int
-	err        error
-	output     string
-	outputErr  error
-	duration   time.Duration
-	lastCmd    string
-	viewScroll int
+	repo        config.Repo
+	commands    []JustCommand
+	cursor      int
+	scrollPos   int
+	state       State
+	selected    bool
+	focused     bool
+	width       int
+	height      int
+	err         error
+	output      string
+	outputErr   error
+	duration    time.Duration
+	lastCmd     string
+	viewScroll  int
+	needsReload bool
 }
 
 type CommandsLoadedMsg struct {
@@ -83,7 +84,17 @@ func (m *Module) Name() string {
 }
 
 func (m *Module) SetRepo(repo config.Repo) modules.Module {
-	m.repo = repo
+	if m.repo.Path != repo.Path {
+		m.repo = repo
+		m.commands = []JustCommand{}
+		m.cursor = 0
+		m.scrollPos = 0
+		m.state = StateNormal
+		m.output = ""
+		m.lastCmd = ""
+		m.err = nil
+		m.needsReload = true
+	}
 	return m
 }
 
@@ -120,12 +131,18 @@ func (m *Module) loadCommands() tea.Cmd {
 
 			// Check for command definition (name followed by colon, not indented)
 			if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") && strings.Contains(line, ":") {
+				// Skip variable assignments (`:=` syntax)
+				if strings.Contains(line, ":=") {
+					lastComment = ""
+					continue
+				}
+
 				// Extract command name (everything before the colon)
 				parts := strings.SplitN(line, ":", 2)
 				name := strings.TrimSpace(parts[0])
 
-				// Skip if it looks like a variable assignment or empty
-				if name == "" || strings.Contains(name, "=") || strings.Contains(name, " ") {
+				// Skip if it looks like a variable assignment, empty, or is the default recipe
+				if name == "" || name == "default" || strings.Contains(name, "=") || strings.Contains(name, " ") {
 					lastComment = ""
 					continue
 				}
@@ -167,6 +184,12 @@ func (m *Module) runCommand(name string) tea.Cmd {
 }
 
 func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
+	// Check if we need to reload commands after repo change
+	if m.needsReload && m.repo.Path != "" {
+		m.needsReload = false
+		return m, m.loadCommands()
+	}
+
 	switch msg := msg.(type) {
 	case CommandsLoadedMsg:
 		if msg.Path == m.repo.Path {
