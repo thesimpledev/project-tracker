@@ -1,0 +1,12 @@
+# Binaries (root level only)
+/pt
+/project-tracker
+
+# Test output
+test/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

@@ -15,13 +15,18 @@ A modular terminal dashboard for tracking project status. Built with Go and [Bub
 
 ```bash
 # Install via go install
-go install github.com/thesimpledev/project-tracker@latest
+go install github.com/thesimpledev/project-tracker/cmd/pt@latest
 
 # Or build from source
 git clone https://github.com/thesimpledev/project-tracker.git
 cd project-tracker
-go build -o project-tracker .
-./project-tracker
+go build -o pt ./cmd/pt
+./pt
+```
+
+Then run with:
+```bash
+pt
 ```
 
 ### Requirements
