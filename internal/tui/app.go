@@ -215,7 +215,7 @@ func (a App) handleGreetingCommand(cmd components.Command) (App, tea.Cmd) {
 	case components.CmdQuit:
 		return a, tea.Quit
 
-	case components.CmdAdd:
+	case components.CmdChange:
 		if cmd.Arg != "" {
 			info, err := repo.GetRepoInfo(cmd.Arg)
 			if err != nil || info == nil {
@@ -228,11 +228,11 @@ func (a App) handleGreetingCommand(cmd components.Command) (App, tea.Cmd) {
 				Owner: info.Owner,
 				Name:  info.Name,
 			}
-			a.config.AddRepo(newRepo)
+			a.config.Repos = []config.Repo{newRepo}
 			a.config.LastOpenedDir = info.Path
 			a.config.Save()
 
-			// Now switch to dashboard view
+			// Switch to dashboard view
 			a.view = ViewDashboard
 			mods := buildModules(a.config)
 			a.dashboard = views.NewDashboardModel(a.config, mods)
@@ -241,27 +241,7 @@ func (a App) handleGreetingCommand(cmd components.Command) (App, tea.Cmd) {
 		}
 		return a, nil
 
-	case components.CmdLoad:
-		if cmd.Arg != "" {
-			loadedCfg, err := config.LoadProfile(cmd.Arg)
-			if err == nil && loadedCfg != nil && len(loadedCfg.Repos) > 0 {
-				a.config.Repos = loadedCfg.Repos
-				a.config.ProfileName = cmd.Arg
-				a.config.LastOpenedDir = loadedCfg.Repos[0].Path
-				a.config.Save()
-
-				// Switch to dashboard
-				a.view = ViewDashboard
-				mods := buildModules(a.config)
-				a.dashboard = views.NewDashboardModel(a.config, mods)
-				a.dashboard = a.dashboard.SetSize(a.width, a.height)
-				return a, tea.Batch(a.dashboard.Init(), tickCmd())
-			}
-		}
-		return a, nil
-
 	default:
-		// Other commands don't cause view switch
 		return a, nil
 	}
 }

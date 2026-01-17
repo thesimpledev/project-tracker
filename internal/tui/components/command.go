@@ -8,7 +8,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/thesimpledev/project-tracker/internal/config"
 	"github.com/thesimpledev/project-tracker/internal/repo"
 )
 
@@ -16,13 +15,8 @@ type CommandType int
 
 const (
 	CmdUnknown CommandType = iota
-	CmdAdd
-	CmdRemove
-	CmdRefresh
+	CmdChange
 	CmdQuit
-	CmdSave
-	CmdLoad
-	CmdNew
 )
 
 type Command struct {
@@ -37,7 +31,6 @@ type CommandInput struct {
 	SuggestionIdx   int
 	ShowSuggestions bool
 	Width           int
-	repos           []config.Repo
 	LastPath        string
 }
 
@@ -45,19 +38,12 @@ type ExecuteCommandMsg struct {
 	Cmd Command
 }
 
-func NewCommandInput(repos []config.Repo) CommandInput {
-	return CommandInput{
-		repos: repos,
-	}
+func NewCommandInput() CommandInput {
+	return CommandInput{}
 }
 
 func (c CommandInput) SetSize(width int) CommandInput {
 	c.Width = width
-	return c
-}
-
-func (c CommandInput) SetRepos(repos []config.Repo) CommandInput {
-	c.repos = repos
 	return c
 }
 
@@ -118,12 +104,12 @@ func (c CommandInput) Update(msg tea.Msg) (CommandInput, tea.Cmd) {
 				}
 
 				isRepo := strings.HasSuffix(suggestion, " [repo]")
-				isAddPath := strings.HasPrefix(suggestion, ":add ")
+				isChangePath := strings.HasPrefix(suggestion, ":change ") || strings.HasPrefix(suggestion, ":c ")
 				suggestion = strings.TrimSuffix(suggestion, " [repo]")
 
 				if isRepo {
 					c.Input = suggestion
-				} else if isAddPath && !isRepo {
+				} else if isChangePath && !isRepo {
 					c.Input = suggestion + "/"
 				} else {
 					c.Input = suggestion
@@ -186,12 +172,8 @@ func (c *CommandInput) updateSuggestions() {
 		hint string
 	}
 	commands := []cmdInfo{
-		{"add", "<path>"},
-		{"remove", "<repo>"},
-		{"save", "<name>"},
-		{"load", "<profile>"},
-		{"new", ""},
-		{"refresh", ""},
+		{"change", "<path>"},
+		{"c", "<path>"},
 		{"quit", ""},
 		{"q", ""},
 	}
@@ -208,12 +190,8 @@ func (c *CommandInput) updateSuggestions() {
 		}
 	} else {
 		switch cmd {
-		case "add":
+		case "change", "c":
 			c.Suggestions = c.completePath(arg)
-		case "remove":
-			c.Suggestions = c.completeRepo(arg)
-		case "load":
-			c.Suggestions = c.completeProfile(arg)
 		}
 	}
 }
@@ -258,48 +236,12 @@ func (c *CommandInput) completePath(partial string) []string {
 		fullPath := filepath.Join(dir, entry.Name())
 
 		isGitRepo := repo.IsGitRepo(fullPath)
-		suggestion := ":add " + fullPath
+		suggestion := ":change " + fullPath
 		if isGitRepo {
 			suggestion += " [repo]"
 		}
 		suggestions = append(suggestions, suggestion)
 
-		if len(suggestions) >= 10 {
-			break
-		}
-	}
-
-	return suggestions
-}
-
-func (c *CommandInput) completeRepo(partial string) []string {
-	var suggestions []string
-
-	for _, r := range c.repos {
-		name := r.Owner + "/" + r.Name
-		if partial == "" || strings.Contains(strings.ToLower(name), strings.ToLower(partial)) {
-			suggestions = append(suggestions, ":remove "+name)
-		}
-		if len(suggestions) >= 10 {
-			break
-		}
-	}
-
-	return suggestions
-}
-
-func (c *CommandInput) completeProfile(partial string) []string {
-	var suggestions []string
-
-	profiles, err := config.ListProfiles()
-	if err != nil {
-		return suggestions
-	}
-
-	for _, profile := range profiles {
-		if partial == "" || strings.HasPrefix(strings.ToLower(profile), strings.ToLower(partial)) {
-			suggestions = append(suggestions, ":load "+profile)
-		}
 		if len(suggestions) >= 10 {
 			break
 		}
@@ -329,18 +271,8 @@ func (c CommandInput) parseCommand() Command {
 	}
 
 	switch cmd {
-	case "add":
-		return Command{Type: CmdAdd, Arg: arg}
-	case "remove":
-		return Command{Type: CmdRemove, Arg: arg}
-	case "save":
-		return Command{Type: CmdSave, Arg: arg}
-	case "load":
-		return Command{Type: CmdLoad, Arg: arg}
-	case "new":
-		return Command{Type: CmdNew}
-	case "refresh":
-		return Command{Type: CmdRefresh}
+	case "change", "c":
+		return Command{Type: CmdChange, Arg: arg}
 	case "quit", "q":
 		return Command{Type: CmdQuit}
 	default:
@@ -423,7 +355,7 @@ func (c CommandInput) View() string {
 		// Show inline hint when focused but no suggestions yet
 		b.WriteString("\n")
 		hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-		b.WriteString(hintStyle.Render("  :add  :remove  :refresh  :quit"))
+		b.WriteString(hintStyle.Render("  :change <path>  :quit"))
 	}
 
 	return b.String()

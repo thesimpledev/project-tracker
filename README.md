@@ -63,15 +63,11 @@ Press `:` to enter command mode, then type a command:
 
 | Command | Description |
 |---------|-------------|
-| `:add <path>` | Add a project directory |
-| `:remove <repo>` | Remove a project (owner/name) |
-| `:refresh` | Refresh all modules |
-| `:save <name>` | Save current layout as profile |
-| `:load <name>` | Load a saved profile |
-| `:new` | Clear all projects |
+| `:change <path>` | Change to a different project |
+| `:c <path>` | Short for `:change` |
 | `:q` or `:quit` | Quit |
 
-**Tab completion** is available for paths, repos, and profiles.
+**Tab completion** is available for paths. Paths marked `[repo]` are git repositories.
 
 ---
 

@@ -47,7 +47,7 @@ func NewDashboardModel(cfg *config.Config, mods []modules.Module) DashboardModel
 	return DashboardModel{
 		config:       cfg,
 		grid:         components.NewGrid(mods),
-		commandInput: components.NewCommandInput(cfg.Repos),
+		commandInput: components.NewCommandInput(),
 		mode:         ModeGrid,
 		profileName:  cfg.ProfileName,
 	}
@@ -149,11 +149,7 @@ func (m DashboardModel) handleCommand(cmd components.Command) (DashboardModel, t
 	case components.CmdQuit:
 		return m, tea.Quit
 
-	case components.CmdRefresh:
-		m.mode = ModeGrid
-		return m, m.grid.RefreshAll()
-
-	case components.CmdAdd:
+	case components.CmdChange:
 		if cmd.Arg != "" {
 			info, err := repo.GetRepoInfo(cmd.Arg)
 			if err != nil || info == nil {
@@ -167,7 +163,8 @@ func (m DashboardModel) handleCommand(cmd components.Command) (DashboardModel, t
 				Owner: info.Owner,
 				Name:  info.Name,
 			}
-			m.config.AddRepo(newRepo)
+			// Replace with the new repo
+			m.config.Repos = []config.Repo{newRepo}
 			m.config.LastOpenedDir = info.Path
 			m.config.Save()
 
@@ -175,7 +172,6 @@ func (m DashboardModel) handleCommand(cmd components.Command) (DashboardModel, t
 			mods := buildModulesFromConfig(m.config)
 			m.grid = components.NewGrid(mods)
 			m.grid = m.grid.SetSize(m.width, m.height-6)
-			m.commandInput = m.commandInput.SetRepos(m.config.Repos)
 			m.commandInput = m.commandInput.SetLastPath(info.Path)
 			m.mode = ModeGrid
 			return m, m.grid.Init()
@@ -183,78 +179,10 @@ func (m DashboardModel) handleCommand(cmd components.Command) (DashboardModel, t
 		m.mode = ModeGrid
 		return m, nil
 
-	case components.CmdRemove:
-		if cmd.Arg != "" {
-			parts := splitOwnerName(cmd.Arg)
-			if len(parts) == 2 {
-				m.config.RemoveRepo(parts[0], parts[1])
-				m.config.Save()
-
-				mods := buildModulesFromConfig(m.config)
-				m.grid = components.NewGrid(mods)
-				m.grid = m.grid.SetSize(m.width, m.height-6)
-				m.commandInput = m.commandInput.SetRepos(m.config.Repos)
-			}
-		}
-		m.mode = ModeGrid
-		return m, nil
-
-	case components.CmdSave:
-		if cmd.Arg != "" {
-			m.config.SaveProfile(cmd.Arg)
-			m.profileName = cmd.Arg
-			m.config.ProfileName = cmd.Arg
-			m.config.Save()
-		}
-		m.mode = ModeGrid
-		return m, m.setWindowTitle()
-
-	case components.CmdLoad:
-		if cmd.Arg != "" {
-			loadedCfg, err := config.LoadProfile(cmd.Arg)
-			if err == nil && loadedCfg != nil {
-				m.config.Repos = loadedCfg.Repos
-				m.config.ProfileName = cmd.Arg
-				m.config.Save()
-				m.profileName = cmd.Arg
-
-				mods := buildModulesFromConfig(m.config)
-				m.grid = components.NewGrid(mods)
-				m.grid = m.grid.SetSize(m.width, m.height-6)
-				m.commandInput = m.commandInput.SetRepos(m.config.Repos)
-				m.mode = ModeGrid
-				return m, tea.Batch(m.grid.Init(), m.setWindowTitle())
-			}
-		}
-		m.mode = ModeGrid
-		return m, nil
-
-	case components.CmdNew:
-		m.config.Repos = []config.Repo{}
-		m.config.ProfileName = ""
-		m.config.Save()
-		m.profileName = ""
-
-		mods := buildModulesFromConfig(m.config)
-		m.grid = components.NewGrid(mods)
-		m.grid = m.grid.SetSize(m.width, m.height-6)
-		m.commandInput = m.commandInput.SetRepos(m.config.Repos)
-		m.mode = ModeGrid
-		return m, m.setWindowTitle()
-
 	default:
 		m.mode = ModeGrid
 		return m, nil
 	}
-}
-
-func splitOwnerName(s string) []string {
-	for i := 0; i < len(s); i++ {
-		if s[i] == '/' {
-			return []string{s[:i], s[i+1:]}
-		}
-	}
-	return nil
 }
 
 func buildModulesFromConfig(cfg *config.Config) []modules.Module {

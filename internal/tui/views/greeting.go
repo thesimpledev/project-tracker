@@ -28,7 +28,7 @@ type GreetingModel struct {
 
 func NewGreeting(cfg *config.Config) GreetingModel {
 	return GreetingModel{
-		CommandInput: components.NewCommandInput(cfg.Repos),
+		CommandInput: components.NewCommandInput(),
 	}
 }
 
