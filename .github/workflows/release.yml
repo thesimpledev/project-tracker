@@ -45,13 +45,13 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          go build -ldflags="-s -w" -o project-tracker-${{ matrix.suffix }} .
+          go build -ldflags="-s -w" -o pt-${{ matrix.suffix }} ./cmd/pt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: project-tracker-${{ matrix.suffix }}
-          path: project-tracker-${{ matrix.suffix }}
+          name: pt-${{ matrix.suffix }}
+          path: pt-${{ matrix.suffix }}
 
   release:
     name: Release
