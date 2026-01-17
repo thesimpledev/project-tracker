@@ -2,6 +2,8 @@
 
 A modular terminal dashboard for tracking project status. Built with Go and [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 
+![Project Tracker Screenshot](project-tracker.png)
+
 ## Features
 
 - **3x2 grid layout** with 6 module slots
