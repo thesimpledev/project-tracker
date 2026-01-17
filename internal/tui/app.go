@@ -53,16 +53,48 @@ func NewApp(cfg *config.Config) App {
 func buildModules(cfg *config.Config) []modules.Module {
 	var mods []modules.Module
 
+	// Add modules for each repo
+	// Layout: Row 1: CI, TODO, placeholder | Row 2: Git Status, placeholder, placeholder
 	for _, r := range cfg.Repos {
-		mod := modules.Create("ci_status")
-		if mod == nil {
-			mod = modules.Create("placeholder")
+		// Row 1: CI status module
+		ciMod := modules.Create("ci_status")
+		if ciMod == nil {
+			ciMod = modules.Create("placeholder")
 		}
-		if mod != nil {
-			if setter, ok := mod.(interface{ SetRepo(config.Repo) modules.Module }); ok {
-				mod = setter.SetRepo(r)
+		if ciMod != nil {
+			if setter, ok := ciMod.(interface{ SetRepo(config.Repo) modules.Module }); ok {
+				ciMod = setter.SetRepo(r)
 			}
-			mods = append(mods, mod)
+			mods = append(mods, ciMod)
+		}
+
+		// Row 1: TODO module
+		todoMod := modules.Create("todo")
+		if todoMod == nil {
+			todoMod = modules.Create("placeholder")
+		}
+		if todoMod != nil {
+			if setter, ok := todoMod.(interface{ SetRepo(config.Repo) modules.Module }); ok {
+				todoMod = setter.SetRepo(r)
+			}
+			mods = append(mods, todoMod)
+		}
+
+		// Row 1: Placeholder (top right)
+		if placeholder := modules.Create("placeholder"); placeholder != nil {
+			mods = append(mods, placeholder)
+		}
+
+		// Row 2: Git status module (lower left)
+		gitMod := modules.Create("git_status")
+		if gitMod == nil {
+			gitMod = modules.Create("placeholder")
+		}
+		if gitMod != nil {
+			if setter, ok := gitMod.(interface{ SetRepo(config.Repo) modules.Module }); ok {
+				gitMod = setter.SetRepo(r)
+			}
+			mods = append(mods, gitMod)
 		}
 	}
 

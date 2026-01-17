@@ -12,7 +12,9 @@ import (
 
 	// Register modules
 	_ "github.com/thesimpledev/project-tracker/internal/modules/ci_status"
+	_ "github.com/thesimpledev/project-tracker/internal/modules/git_status"
 	_ "github.com/thesimpledev/project-tracker/internal/modules/placeholder"
+	_ "github.com/thesimpledev/project-tracker/internal/modules/todo"
 )
 
 func main() {
