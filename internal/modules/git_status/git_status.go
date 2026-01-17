@@ -46,6 +46,7 @@ type Module struct {
 	err       error
 	scrollPos int
 	cursor    int
+	fetching  bool // Prevents overlapping git status fetches
 }
 
 type GitStatusMsg struct {
@@ -88,12 +89,13 @@ func (m *Module) Init() tea.Cmd {
 	if m.repo.Path == "" {
 		return nil
 	}
+	m.fetching = true
 	return tea.Batch(m.fetchStatus(), m.tick())
 }
 
 func (m *Module) tick() tea.Cmd {
 	path := m.repo.Path
-	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+	return tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
 		return GitTickMsg{Path: path}
 	})
 }
@@ -101,16 +103,16 @@ func (m *Module) tick() tea.Cmd {
 func (m *Module) fetchStatus() tea.Cmd {
 	path := m.repo.Path
 	return func() tea.Msg {
-		// Get current branch
-		branchCmd := exec.Command("git", "-C", path, "branch", "--show-current")
+		// Get current branch (use --no-optional-locks to avoid blocking during heavy writes)
+		branchCmd := exec.Command("git", "-C", path, "--no-optional-locks", "branch", "--show-current")
 		branchOut, err := branchCmd.Output()
 		if err != nil {
 			return GitStatusMsg{Path: path, Error: err}
 		}
 		branch := strings.TrimSpace(string(branchOut))
 
-		// Get status
-		statusCmd := exec.Command("git", "-C", path, "status", "--porcelain")
+		// Get status (use --no-optional-locks to avoid blocking during heavy writes)
+		statusCmd := exec.Command("git", "-C", path, "--no-optional-locks", "status", "--porcelain")
 		statusOut, err := statusCmd.Output()
 		if err != nil {
 			return GitStatusMsg{Path: path, Branch: branch, Error: err}
@@ -165,6 +167,7 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 	switch msg := msg.(type) {
 	case GitStatusMsg:
 		if msg.Path == m.repo.Path {
+			m.fetching = false
 			m.branch = msg.Branch
 			m.changes = msg.Changes
 			m.staged = msg.Staged
@@ -176,6 +179,11 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 
 	case GitTickMsg:
 		if msg.Path == m.repo.Path {
+			// Skip if already fetching to prevent overlapping requests
+			if m.fetching {
+				return m, m.tick()
+			}
+			m.fetching = true
 			return m, tea.Batch(m.fetchStatus(), m.tick())
 		}
 		return m, nil
