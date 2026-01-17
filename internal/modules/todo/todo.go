@@ -191,11 +191,16 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 				m.inputBuffer = ""
 			case "enter":
 				if m.inputBuffer != "" {
-					// Insert new item at cursor position (in unchecked section)
+					// Insert new item at the end of unchecked section
 					newItem := TodoItem{Text: m.inputBuffer, Checked: false}
-					insertPos := m.cursor
-					if insertPos > len(m.items) {
-						insertPos = len(m.items)
+					// Find the position after the last unchecked item
+					insertPos := 0
+					for i, item := range m.items {
+						if item.Checked {
+							insertPos = i
+							break
+						}
+						insertPos = i + 1
 					}
 					m.items = append(m.items[:insertPos], append([]TodoItem{newItem}, m.items[insertPos:]...)...)
 					m.cursor = insertPos

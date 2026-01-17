@@ -112,9 +112,18 @@ func buildModules(cfg *config.Config) []modules.Module {
 			mods = append(mods, gitMod)
 		}
 
-		// Row 2: Placeholder (lower middle)
-		if placeholder := modules.Create("placeholder"); placeholder != nil {
-			mods = append(mods, placeholder)
+		// Row 2: Just commands module (lower middle)
+		justMod := modules.Create("just_commands")
+		if justMod == nil {
+			justMod = modules.Create("placeholder")
+		}
+		if justMod != nil {
+			if setter, ok := justMod.(interface {
+				SetRepo(config.Repo) modules.Module
+			}); ok {
+				justMod = setter.SetRepo(r)
+			}
+			mods = append(mods, justMod)
 		}
 
 		// Row 2: Test runner module (lower right)
