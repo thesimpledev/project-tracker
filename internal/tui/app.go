@@ -54,7 +54,7 @@ func buildModules(cfg *config.Config) []modules.Module {
 	var mods []modules.Module
 
 	// Add modules for each repo
-	// Layout: Row 1: CI, TODO, Notes | Row 2: Git Status, placeholder, Tests
+	// Layout: Row 1: CI, TODO, Notes | Row 2: Git Status, Just Commands (2 cols)
 	for _, r := range cfg.Repos {
 		// Row 1: CI status module (top left)
 		ciMod := modules.Create("ci_status")
@@ -112,7 +112,7 @@ func buildModules(cfg *config.Config) []modules.Module {
 			mods = append(mods, gitMod)
 		}
 
-		// Row 2: Just commands module (lower middle)
+		// Row 2: Just commands module (lower middle + right, spans 2 columns)
 		justMod := modules.Create("just_commands")
 		if justMod == nil {
 			justMod = modules.Create("placeholder")
@@ -125,24 +125,10 @@ func buildModules(cfg *config.Config) []modules.Module {
 			}
 			mods = append(mods, justMod)
 		}
-
-		// Row 2: Test runner module (lower right)
-		testMod := modules.Create("test_runner")
-		if testMod == nil {
-			testMod = modules.Create("placeholder")
-		}
-		if testMod != nil {
-			if setter, ok := testMod.(interface {
-				SetRepo(config.Repo) modules.Module
-			}); ok {
-				testMod = setter.SetRepo(r)
-			}
-			mods = append(mods, testMod)
-		}
 	}
 
-	// Fill remaining slots with placeholders (up to 6)
-	for len(mods) < 6 {
+	// Fill remaining slots with placeholders (up to 5)
+	for len(mods) < 5 {
 		if placeholder := modules.Create("placeholder"); placeholder != nil {
 			mods = append(mods, placeholder)
 		} else {

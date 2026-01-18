@@ -219,13 +219,30 @@ func (g Grid) View() string {
 		for col := 0; col < GridCols; col++ {
 			idx := row*GridCols + col
 			if idx < len(g.Modules) {
-				mod := g.Modules[idx].SetSize(moduleWidth, moduleHeight)
+				// Check if this module should span remaining columns
+				nextIdx := idx + 1
+				remainingCols := GridCols - col
+				isLastInRow := nextIdx >= len(g.Modules) || nextIdx >= (row+1)*GridCols
+
+				// Calculate width: if this is the last module in the row and there are
+				// empty slots after it, expand to fill them
+				effectiveWidth := moduleWidth
+				if isLastInRow && remainingCols > 1 && nextIdx >= len(g.Modules) {
+					effectiveWidth = moduleWidth * remainingCols
+				}
+
+				mod := g.Modules[idx].SetSize(effectiveWidth, moduleHeight)
 
 				// Set selection state (cursor on module but not focused)
 				isSelected := idx == g.Cursor && g.State == GridNavigating
 				mod = mod.SetSelected(isSelected)
 
 				rowModules = append(rowModules, mod.View())
+
+				// Skip remaining columns if we expanded
+				if effectiveWidth > moduleWidth {
+					break
+				}
 			} else {
 				// Empty cell
 				emptyStyle := lipgloss.NewStyle().
