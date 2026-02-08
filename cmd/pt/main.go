@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -32,6 +34,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Please run: gh auth login")
 		os.Exit(1)
 	}
+
+	// Start pprof server for profiling
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
 
 	cfg, err := config.Load()
 	if err != nil {
