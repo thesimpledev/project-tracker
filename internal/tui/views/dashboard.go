@@ -9,7 +9,6 @@ import (
 
 	"github.com/thesimpledev/project-tracker/internal/config"
 	"github.com/thesimpledev/project-tracker/internal/modules"
-	"github.com/thesimpledev/project-tracker/internal/modules/test_runner"
 	"github.com/thesimpledev/project-tracker/internal/repo"
 	"github.com/thesimpledev/project-tracker/internal/tui/components"
 )
@@ -44,10 +43,14 @@ type RepoRemovedMsg struct {
 }
 
 func NewDashboardModel(cfg *config.Config, mods []modules.Module) DashboardModel {
+	ci := components.NewCommandInput()
+	if cfg.LastOpenedDir != "" {
+		ci = ci.SetLastPath(cfg.LastOpenedDir)
+	}
 	return DashboardModel{
 		config:       cfg,
 		grid:         components.NewGrid(mods),
-		commandInput: components.NewCommandInput(),
+		commandInput: ci,
 		mode:         ModeGrid,
 		profileName:  cfg.ProfileName,
 	}
@@ -99,14 +102,6 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 				m.mode = ModeGrid
 				m.commandInput = m.commandInput.SetFocused(false)
 				return m, nil
-			}
-		case "t":
-			// Global 't' to trigger tests from anywhere in grid mode
-			if m.mode == ModeGrid && m.grid.State == components.GridNavigating {
-				// Broadcast test run message to all modules
-				var cmd tea.Cmd
-				m.grid, cmd = m.grid.Update(test_runner.TriggerTestRun())
-				return m, cmd
 			}
 		}
 
@@ -169,7 +164,7 @@ func (m DashboardModel) handleCommand(cmd components.Command) (DashboardModel, t
 			m.config.Save()
 
 			// Rebuild grid with new module
-			mods := buildModulesFromConfig(m.config)
+			mods := BuildModules(m.config)
 			m.grid = components.NewGrid(mods)
 			m.grid = m.grid.SetSize(m.width, m.height-6)
 			m.commandInput = m.commandInput.SetLastPath(info.Path)
@@ -185,99 +180,23 @@ func (m DashboardModel) handleCommand(cmd components.Command) (DashboardModel, t
 	}
 }
 
-func buildModulesFromConfig(cfg *config.Config) []modules.Module {
+// BuildModules constructs the dashboard's module set for the given config.
+// Layout: Row 1: CI, TODO, Notes | Row 2: Git Status, Just Commands (spans 2 cols).
+// Total of 5 modules per repo; the grid auto-expands the last module in a row
+// into any trailing empty cells (see components/grid.go).
+func BuildModules(cfg *config.Config) []modules.Module {
 	var mods []modules.Module
 
-	// Add modules for each repo
-	// Layout: Row 1: CI, TODO, Notes | Row 2: Git Status, placeholder, Tests
+	ids := []string{"ci_status", "todo", "notes", "git_status", "just_commands"}
 	for _, r := range cfg.Repos {
-		// Row 1: CI status module (top left)
-		ciMod := modules.Create("ci_status")
-		if ciMod == nil {
-			ciMod = modules.Create("placeholder")
-		}
-		if ciMod != nil {
-			if setter, ok := ciMod.(interface {
-				SetRepo(config.Repo) modules.Module
-			}); ok {
-				ciMod = setter.SetRepo(r)
+		for _, id := range ids {
+			if mod := createWithRepo(id, r); mod != nil {
+				mods = append(mods, mod)
 			}
-			mods = append(mods, ciMod)
-		}
-
-		// Row 1: TODO module (top middle)
-		todoMod := modules.Create("todo")
-		if todoMod == nil {
-			todoMod = modules.Create("placeholder")
-		}
-		if todoMod != nil {
-			if setter, ok := todoMod.(interface {
-				SetRepo(config.Repo) modules.Module
-			}); ok {
-				todoMod = setter.SetRepo(r)
-			}
-			mods = append(mods, todoMod)
-		}
-
-		// Row 1: Notes module (top right)
-		notesMod := modules.Create("notes")
-		if notesMod == nil {
-			notesMod = modules.Create("placeholder")
-		}
-		if notesMod != nil {
-			if setter, ok := notesMod.(interface {
-				SetRepo(config.Repo) modules.Module
-			}); ok {
-				notesMod = setter.SetRepo(r)
-			}
-			mods = append(mods, notesMod)
-		}
-
-		// Row 2: Git status module (lower left)
-		gitMod := modules.Create("git_status")
-		if gitMod == nil {
-			gitMod = modules.Create("placeholder")
-		}
-		if gitMod != nil {
-			if setter, ok := gitMod.(interface {
-				SetRepo(config.Repo) modules.Module
-			}); ok {
-				gitMod = setter.SetRepo(r)
-			}
-			mods = append(mods, gitMod)
-		}
-
-		// Row 2: Just commands module (lower middle)
-		justMod := modules.Create("just_commands")
-		if justMod == nil {
-			justMod = modules.Create("placeholder")
-		}
-		if justMod != nil {
-			if setter, ok := justMod.(interface {
-				SetRepo(config.Repo) modules.Module
-			}); ok {
-				justMod = setter.SetRepo(r)
-			}
-			mods = append(mods, justMod)
-		}
-
-		// Row 2: Test runner module (lower right)
-		testMod := modules.Create("test_runner")
-		if testMod == nil {
-			testMod = modules.Create("placeholder")
-		}
-		if testMod != nil {
-			if setter, ok := testMod.(interface {
-				SetRepo(config.Repo) modules.Module
-			}); ok {
-				testMod = setter.SetRepo(r)
-			}
-			mods = append(mods, testMod)
 		}
 	}
 
-	// Fill remaining slots with placeholders (up to 6)
-	for len(mods) < 6 {
+	for len(mods) < 5 {
 		if placeholder := modules.Create("placeholder"); placeholder != nil {
 			mods = append(mods, placeholder)
 		} else {
@@ -286,6 +205,22 @@ func buildModulesFromConfig(cfg *config.Config) []modules.Module {
 	}
 
 	return mods
+}
+
+func createWithRepo(id string, r config.Repo) modules.Module {
+	mod := modules.Create(id)
+	if mod == nil {
+		mod = modules.Create("placeholder")
+	}
+	if mod == nil {
+		return nil
+	}
+	if setter, ok := mod.(interface {
+		SetRepo(config.Repo) modules.Module
+	}); ok {
+		mod = setter.SetRepo(r)
+	}
+	return mod
 }
 
 func (m DashboardModel) View() string {

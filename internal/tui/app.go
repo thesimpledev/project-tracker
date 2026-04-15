@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -34,9 +35,25 @@ func NewApp(cfg *config.Config) App {
 	var view AppView
 	var mods []modules.Module
 
+	// If launched from inside a git repo, prefer it over the last-opened
+	// project from config.
+	if cwd, err := os.Getwd(); err == nil {
+		if root := repo.FindRepoRoot(cwd); root != "" {
+			if info, _ := repo.GetRepoInfo(root); info != nil {
+				cfg.Repos = []config.Repo{{
+					Path:  info.Path,
+					Owner: info.Owner,
+					Name:  info.Name,
+				}}
+				cfg.LastOpenedDir = info.Path
+				cfg.Save()
+			}
+		}
+	}
+
 	if cfg.HasLastOpenedDir() && len(cfg.Repos) > 0 {
 		view = ViewDashboard
-		mods = buildModules(cfg)
+		mods = views.BuildModules(cfg)
 	} else {
 		view = ViewGreeting
 		mods = make([]modules.Module, 0)
@@ -48,95 +65,6 @@ func NewApp(cfg *config.Config) App {
 		greeting:  views.NewGreeting(cfg),
 		dashboard: views.NewDashboardModel(cfg, mods),
 	}
-}
-
-func buildModules(cfg *config.Config) []modules.Module {
-	var mods []modules.Module
-
-	// Add modules for each repo
-	// Layout: Row 1: CI, TODO, Notes | Row 2: Git Status, Just Commands (2 cols)
-	for _, r := range cfg.Repos {
-		// Row 1: CI status module (top left)
-		ciMod := modules.Create("ci_status")
-		if ciMod == nil {
-			ciMod = modules.Create("placeholder")
-		}
-		if ciMod != nil {
-			if setter, ok := ciMod.(interface {
-				SetRepo(config.Repo) modules.Module
-			}); ok {
-				ciMod = setter.SetRepo(r)
-			}
-			mods = append(mods, ciMod)
-		}
-
-		// Row 1: TODO module (top middle)
-		todoMod := modules.Create("todo")
-		if todoMod == nil {
-			todoMod = modules.Create("placeholder")
-		}
-		if todoMod != nil {
-			if setter, ok := todoMod.(interface {
-				SetRepo(config.Repo) modules.Module
-			}); ok {
-				todoMod = setter.SetRepo(r)
-			}
-			mods = append(mods, todoMod)
-		}
-
-		// Row 1: Notes module (top right)
-		notesMod := modules.Create("notes")
-		if notesMod == nil {
-			notesMod = modules.Create("placeholder")
-		}
-		if notesMod != nil {
-			if setter, ok := notesMod.(interface {
-				SetRepo(config.Repo) modules.Module
-			}); ok {
-				notesMod = setter.SetRepo(r)
-			}
-			mods = append(mods, notesMod)
-		}
-
-		// Row 2: Git status module (lower left)
-		gitMod := modules.Create("git_status")
-		if gitMod == nil {
-			gitMod = modules.Create("placeholder")
-		}
-		if gitMod != nil {
-			if setter, ok := gitMod.(interface {
-				SetRepo(config.Repo) modules.Module
-			}); ok {
-				gitMod = setter.SetRepo(r)
-			}
-			mods = append(mods, gitMod)
-		}
-
-		// Row 2: Just commands module (lower middle + right, spans 2 columns)
-		justMod := modules.Create("just_commands")
-		if justMod == nil {
-			justMod = modules.Create("placeholder")
-		}
-		if justMod != nil {
-			if setter, ok := justMod.(interface {
-				SetRepo(config.Repo) modules.Module
-			}); ok {
-				justMod = setter.SetRepo(r)
-			}
-			mods = append(mods, justMod)
-		}
-	}
-
-	// Fill remaining slots with placeholders (up to 5)
-	for len(mods) < 5 {
-		if placeholder := modules.Create("placeholder"); placeholder != nil {
-			mods = append(mods, placeholder)
-		} else {
-			break
-		}
-	}
-
-	return mods
 }
 
 func (a App) Init() tea.Cmd {
@@ -229,7 +157,7 @@ func (a App) handleGreetingCommand(cmd components.Command) (App, tea.Cmd) {
 
 			// Switch to dashboard view
 			a.view = ViewDashboard
-			mods := buildModules(a.config)
+			mods := views.BuildModules(a.config)
 			a.dashboard = views.NewDashboardModel(a.config, mods)
 			a.dashboard = a.dashboard.SetSize(a.width, a.height)
 			return a, tea.Batch(a.dashboard.Init(), tickCmd())

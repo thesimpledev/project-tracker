@@ -23,6 +23,18 @@ func IsGitRepo(path string) bool {
 	return info.IsDir()
 }
 
+// FindRepoRoot returns the toplevel of the git repo containing path, or ""
+// if path is not inside a git repo. Lets pt detect "I'm in a repo" even when
+// cwd is a subdirectory.
+func FindRepoRoot(path string) string {
+	cmd := exec.Command("git", "-C", path, "rev-parse", "--show-toplevel")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
 func GetRepoInfo(path string) (*RepoInfo, error) {
 	if !IsGitRepo(path) {
 		return nil, nil

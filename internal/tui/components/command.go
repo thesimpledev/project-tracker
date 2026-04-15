@@ -86,6 +86,16 @@ func (c CommandInput) Update(msg tea.Msg) (CommandInput, tea.Cmd) {
 				return c, nil
 			}
 			cmd := c.parseCommand()
+			// If the command needs an argument but none was provided,
+			// stay in command mode and append a space so path completion
+			// kicks in on the next keystroke.
+			if cmd.Type == CmdChange && cmd.Arg == "" {
+				if !strings.HasSuffix(c.Input, " ") {
+					c.Input += " "
+				}
+				c.updateSuggestions()
+				return c, nil
+			}
 			c.Focused = false
 			c.Input = ""
 			c.Suggestions = nil
@@ -196,13 +206,26 @@ func (c *CommandInput) updateSuggestions() {
 	}
 }
 
+func hasGitRepoChildren(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		if repo.IsGitRepo(filepath.Join(dir, entry.Name())) {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *CommandInput) completePath(partial string) []string {
 	var suggestions []string
 
 	dir := "."
-	if c.LastPath != "" {
-		dir = c.LastPath
-	}
 	prefix := ""
 
 	if partial != "" {
@@ -213,6 +236,10 @@ func (c *CommandInput) completePath(partial string) []string {
 			dir = filepath.Dir(partial)
 			prefix = filepath.Base(partial)
 		}
+	} else if !hasGitRepoChildren(dir) && c.LastPath != "" {
+		// cwd has no git repos to switch into — fall back to the parent
+		// of the last opened project so siblings show up.
+		dir = c.LastPath
 	}
 
 	dir = filepath.Clean(dir)
@@ -341,11 +368,15 @@ func (c CommandInput) View() string {
 						PaddingLeft(2)
 				}
 
+				// Strip the verb (":change " or ":c ") so users see the
+				// path itself, not "change cmd" / "change internal".
 				display := sug
-				repoColor := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+				display = strings.TrimPrefix(display, ":change ")
+				display = strings.TrimPrefix(display, ":c ")
 
-				if strings.HasSuffix(sug, " [repo]") {
-					base := strings.TrimSuffix(sug, " [repo]")
+				if strings.HasSuffix(display, " [repo]") {
+					base := strings.TrimSuffix(display, " [repo]")
+					repoColor := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
 					display = base + repoColor.Render(" [repo]")
 				}
 				b.WriteString(style.Render(prefix+display) + "\n")

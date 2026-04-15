@@ -115,11 +115,10 @@ func (m GreetingModel) View() string {
 		key  string
 		desc string
 	}{
-		{":add <path>", "Add a project directory"},
-		{":remove <repo>", "Remove a project"},
-		{":save <name>", "Save current layout as profile"},
-		{":load <profile>", "Load a saved profile"},
-		{":q", "Quit"},
+		{":change <path>", "Open a project directory"},
+		{":c <path>", "Shorthand for :change"},
+		{":quit", "Quit"},
+		{":q", "Shorthand for :quit"},
 	}
 
 	for _, kb := range keybinds {

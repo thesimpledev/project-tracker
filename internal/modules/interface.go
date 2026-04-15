@@ -2,6 +2,13 @@ package modules
 
 import tea "github.com/charmbracelet/bubbletea"
 
+// Modules that hold a repo (most do) should expose
+//
+//	SetRepo(config.Repo) Module
+//
+// via duck typing — see views.BuildModules. When the path changes, SetRepo is
+// expected to clear any cached per-repo state so a future module reuse can't
+// leak data across projects. just_commands.SetRepo is the canonical example.
 type Module interface {
 	ID() string
 	Name() string
