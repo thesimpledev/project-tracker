@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -37,6 +38,11 @@ type JustCommand struct {
 	Name    string
 	Comment string
 }
+
+// recipeNamePattern matches plain just recipe identifiers. Names parsed out
+// of a justfile must match before they are ever passed to exec, so a
+// malformed line can never smuggle a flag or shell metacharacters through.
+var recipeNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9._-]*$`)
 
 type Module struct {
 	repo        config.Repo
@@ -127,7 +133,7 @@ func (m *Module) loadCommands() tea.Cmd {
 	return func() tea.Msg {
 		justfilePath := filepath.Join(path, "justfile")
 
-		file, err := os.Open(justfilePath)
+		file, err := os.Open(justfilePath) // #nosec G304 -- repo path validated at config load
 		if err != nil {
 			return CommandsLoadedMsg{Path: path, Error: err}
 		}
@@ -158,8 +164,8 @@ func (m *Module) loadCommands() tea.Cmd {
 				parts := strings.SplitN(line, ":", 2)
 				name := strings.TrimSpace(parts[0])
 
-				// Skip if it looks like a variable assignment, empty, or is the default recipe
-				if name == "" || name == "default" || strings.Contains(name, "=") || strings.Contains(name, " ") {
+				// Skip if it is not a plain recipe identifier or is the default recipe
+				if name == "default" || !recipeNamePattern.MatchString(name) {
 					lastComment = ""
 					continue
 				}
@@ -191,6 +197,7 @@ func (m *Module) runCommand(name string) tea.Cmd {
 
 	// Start the command in a goroutine
 	go func() {
+		// #nosec G204 -- fixed binary; name matched recipeNamePattern when parsed from the justfile
 		cmd := exec.CommandContext(ctx, "just", name)
 		cmd.Dir = path
 

@@ -106,11 +106,11 @@ func createDefaultTodo(path string) error {
 
 - [ ] Add your first task here
 `
-	return os.WriteFile(path, []byte(content), 0644)
+	return os.WriteFile(path, []byte(content), 0600)
 }
 
 func loadTodoFile(path string) ([]TodoItem, error) {
-	file, err := os.Open(path)
+	file, err := os.Open(path) // #nosec G304 -- repo path validated at config load
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,15 @@ func (m *Module) saveTodo() error {
 		}
 	}
 
-	return os.WriteFile(todoPath, []byte(b.String()), 0644)
+	return os.WriteFile(todoPath, []byte(b.String()), 0600)
+}
+
+// persist saves the todo list and surfaces any failure in the module's error
+// display instead of silently losing data.
+func (m *Module) persist() {
+	if err := m.saveTodo(); err != nil {
+		m.err = err
+	}
 }
 
 func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
@@ -204,7 +212,7 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 					}
 					m.items = append(m.items[:insertPos], append([]TodoItem{newItem}, m.items[insertPos:]...)...)
 					m.cursor = insertPos
-					m.saveTodo()
+					m.persist()
 				}
 				m.state = StateFocused
 				m.inputBuffer = ""
@@ -227,7 +235,7 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 				// Save edit and return to focused
 				if m.editingLine < len(m.items) {
 					m.items[m.editingLine].Text = m.inputBuffer
-					m.saveTodo()
+					m.persist()
 				}
 				m.state = StateFocused
 				m.inputBuffer = ""
@@ -235,7 +243,7 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 				// Save edit and return to focused
 				if m.editingLine < len(m.items) {
 					m.items[m.editingLine].Text = m.inputBuffer
-					m.saveTodo()
+					m.persist()
 				}
 				m.state = StateFocused
 				m.inputBuffer = ""
@@ -270,7 +278,7 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 			// Toggle check/uncheck
 			if m.cursor < len(m.items) {
 				m.toggleItem(m.cursor)
-				m.saveTodo()
+				m.persist()
 			}
 		case "a": // Add new item
 			m.state = StateAdding
@@ -287,21 +295,21 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 				if m.cursor >= len(m.items) && m.cursor > 0 {
 					m.cursor--
 				}
-				m.saveTodo()
+				m.persist()
 			}
 		case "J": // Shift+J - move item down
 			if m.cursor < len(m.items)-1 {
 				m.items[m.cursor], m.items[m.cursor+1] = m.items[m.cursor+1], m.items[m.cursor]
 				m.cursor++
 				m.ensureCursorVisible()
-				m.saveTodo()
+				m.persist()
 			}
 		case "K": // Shift+K - move item up
 			if m.cursor > 0 {
 				m.items[m.cursor], m.items[m.cursor-1] = m.items[m.cursor-1], m.items[m.cursor]
 				m.cursor--
 				m.ensureCursorVisible()
-				m.saveTodo()
+				m.persist()
 			}
 		}
 		return m, nil

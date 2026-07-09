@@ -4,8 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"time"
 )
+
+// ghNamePattern matches the characters GitHub allows in owner and repo names.
+// Anything else is rejected before being placed into an API endpoint.
+var ghNamePattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+func validateOwnerRepo(owner, repo string) error {
+	if !ghNamePattern.MatchString(owner) || !ghNamePattern.MatchString(repo) {
+		return fmt.Errorf("invalid owner/repo name: %q/%q", owner, repo)
+	}
+	return nil
+}
 
 type RunStatus string
 
@@ -59,9 +71,12 @@ func (r *WorkflowRun) RunStatus() RunStatus {
 }
 
 func FetchWorkflowRuns(owner, repo string, limit int) ([]WorkflowRun, error) {
+	if err := validateOwnerRepo(owner, repo); err != nil {
+		return nil, err
+	}
 	endpoint := fmt.Sprintf("repos/%s/%s/actions/runs?per_page=%d", owner, repo, limit)
 
-	cmd := exec.Command("gh", "api", endpoint)
+	cmd := exec.Command("gh", "api", endpoint) // #nosec G204 -- fixed binary, owner/repo validated above
 	output, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -142,9 +157,12 @@ func (j *Job) Duration() time.Duration {
 }
 
 func FetchRunJobs(owner, repo string, runID int64) ([]Job, error) {
+	if err := validateOwnerRepo(owner, repo); err != nil {
+		return nil, err
+	}
 	endpoint := fmt.Sprintf("repos/%s/%s/actions/runs/%d/jobs", owner, repo, runID)
 
-	cmd := exec.Command("gh", "api", endpoint)
+	cmd := exec.Command("gh", "api", endpoint) // #nosec G204 -- fixed binary, owner/repo validated above
 	output, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {

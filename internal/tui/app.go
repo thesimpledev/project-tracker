@@ -46,7 +46,8 @@ func NewApp(cfg *config.Config) App {
 					Name:  info.Name,
 				}}
 				cfg.LastOpenedDir = info.Path
-				cfg.Save()
+				// Best-effort: a failed save only loses last-opened persistence.
+				_ = cfg.Save()
 			}
 		}
 	}
@@ -153,7 +154,8 @@ func (a App) handleGreetingCommand(cmd components.Command) (App, tea.Cmd) {
 			}
 			a.config.Repos = []config.Repo{newRepo}
 			a.config.LastOpenedDir = info.Path
-			a.config.Save()
+			// Best-effort: a failed save only loses last-opened persistence.
+			_ = a.config.Save()
 
 			// Switch to dashboard view
 			a.view = ViewDashboard

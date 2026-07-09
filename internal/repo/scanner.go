@@ -27,6 +27,7 @@ func IsGitRepo(path string) bool {
 // if path is not inside a git repo. Lets pt detect "I'm in a repo" even when
 // cwd is a subdirectory.
 func FindRepoRoot(path string) string {
+	// #nosec G204 -- fixed binary; path is a directory the app is inspecting, passed positionally to -C
 	cmd := exec.Command("git", "-C", path, "rev-parse", "--show-toplevel")
 	output, err := cmd.Output()
 	if err != nil {
@@ -40,6 +41,7 @@ func GetRepoInfo(path string) (*RepoInfo, error) {
 		return nil, nil
 	}
 
+	// #nosec G204 -- fixed binary; path already verified as a git repo directory above
 	cmd := exec.Command("git", "-C", path, "remote", "get-url", "origin")
 	output, err := cmd.Output()
 	if err != nil {

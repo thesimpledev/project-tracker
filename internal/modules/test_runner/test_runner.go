@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -113,7 +114,7 @@ func (m *Module) ensureJustfile() tea.Cmd {
 		justfilePath := filepath.Join(path, "justfile")
 
 		// Check if justfile exists
-		content, err := os.ReadFile(justfilePath)
+		content, err := os.ReadFile(justfilePath) // #nosec G304 -- repo path validated at config load
 		if os.IsNotExist(err) {
 			// Create new justfile with test command
 			newContent := `# Project commands
@@ -122,7 +123,10 @@ func (m *Module) ensureJustfile() tea.Cmd {
 test:
     go test ./...
 `
-			os.WriteFile(justfilePath, []byte(newContent), 0644)
+			// #nosec G306 -- project file, intentionally world-readable
+			if err := os.WriteFile(justfilePath, []byte(newContent), 0644); err != nil {
+				return TestFinishedMsg{Path: path, Error: err}
+			}
 			return nil
 		}
 		if err != nil {
@@ -141,7 +145,10 @@ test:
     go test ./...
 `
 		newContent := string(content) + appendContent
-		os.WriteFile(justfilePath, []byte(newContent), 0644)
+		// #nosec G306 G703 -- project file, intentionally world-readable; repo path validated at config load
+		if err := os.WriteFile(justfilePath, []byte(newContent), 0644); err != nil {
+			return TestFinishedMsg{Path: path, Error: err}
+		}
 		return nil
 	}
 }
@@ -233,13 +240,17 @@ func (m *Module) parseTestOutput(output string) {
 		// Look for patterns like "Tests: X passed, Y failed"
 		countPattern := regexp.MustCompile(`(\d+)\s+passed`)
 		if matches := countPattern.FindStringSubmatch(output); len(matches) > 1 {
-			fmt.Sscanf(matches[1], "%d", &m.passed)
-			m.total += m.passed
+			if n, err := strconv.Atoi(matches[1]); err == nil {
+				m.passed = n
+				m.total += n
+			}
 		}
 		failCountPattern := regexp.MustCompile(`(\d+)\s+failed`)
 		if matches := failCountPattern.FindStringSubmatch(output); len(matches) > 1 {
-			fmt.Sscanf(matches[1], "%d", &m.failed)
-			m.total += m.failed
+			if n, err := strconv.Atoi(matches[1]); err == nil {
+				m.failed = n
+				m.total += n
+			}
 		}
 	}
 }

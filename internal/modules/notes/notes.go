@@ -89,7 +89,7 @@ func (m *Module) loadNotes() tea.Cmd {
 			}
 		}
 
-		content, err := os.ReadFile(notesPath)
+		content, err := os.ReadFile(notesPath) // #nosec G304 -- repo path validated at config load
 		if err != nil {
 			return NotesLoadedMsg{Path: path, Error: err}
 		}
@@ -103,7 +103,7 @@ func createDefaultNotes(path string) error {
 	content := `# Notes
 
 `
-	return os.WriteFile(path, []byte(content), 0644)
+	return os.WriteFile(path, []byte(content), 0600)
 }
 
 func (m *Module) saveNotes() error {
@@ -113,7 +113,15 @@ func (m *Module) saveNotes() error {
 
 	notesPath := filepath.Join(m.repo.Path, "NOTES.md")
 	content := strings.Join(m.lines, "\n")
-	return os.WriteFile(notesPath, []byte(content), 0644)
+	return os.WriteFile(notesPath, []byte(content), 0600)
+}
+
+// persist saves the notes and surfaces any failure in the module's error
+// display instead of silently losing data.
+func (m *Module) persist() {
+	if err := m.saveNotes(); err != nil {
+		m.err = err
+	}
 }
 
 func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
@@ -134,7 +142,7 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 				if m.editingLine < len(m.lines) {
 					m.lines[m.editingLine] = m.inputBuffer
 				}
-				m.saveNotes()
+				m.persist()
 				m.state = StateFocused
 				m.inputBuffer = ""
 			case "enter":
@@ -152,7 +160,7 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 				m.inputBuffer = ""
 				m.cursor = m.editingLine
 				m.ensureCursorVisible()
-				m.saveNotes()
+				m.persist()
 			case "backspace":
 				if len(m.inputBuffer) > 0 {
 					m.inputBuffer = m.inputBuffer[:len(m.inputBuffer)-1]
@@ -227,7 +235,7 @@ func (m *Module) Update(msg tea.Msg) (modules.Module, tea.Cmd) {
 				if m.cursor >= len(m.lines) {
 					m.cursor = len(m.lines) - 1
 				}
-				m.saveNotes()
+				m.persist()
 			}
 		}
 		return m, nil
@@ -393,7 +401,7 @@ func (m *Module) SetFocused(focused bool) modules.Module {
 			if m.editingLine < len(m.lines) {
 				m.lines[m.editingLine] = m.inputBuffer
 			}
-			m.saveNotes()
+			m.persist()
 		}
 		m.state = StateNormal
 		m.cursor = 0

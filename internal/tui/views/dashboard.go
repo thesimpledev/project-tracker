@@ -161,7 +161,9 @@ func (m DashboardModel) handleCommand(cmd components.Command) (DashboardModel, t
 			// Replace with the new repo
 			m.config.Repos = []config.Repo{newRepo}
 			m.config.LastOpenedDir = info.Path
-			m.config.Save()
+			if err := m.config.Save(); err != nil {
+				m.err = err
+			}
 
 			// Rebuild grid with new module
 			mods := BuildModules(m.config)

@@ -104,6 +104,7 @@ func (m *Module) fetchStatus() tea.Cmd {
 	path := m.repo.Path
 	return func() tea.Msg {
 		// Get current branch (use --no-optional-locks to avoid blocking during heavy writes)
+		// #nosec G204 -- fixed binary; repo path validated at config load
 		branchCmd := exec.Command("git", "-C", path, "--no-optional-locks", "branch", "--show-current")
 		branchOut, err := branchCmd.Output()
 		if err != nil {
@@ -112,6 +113,7 @@ func (m *Module) fetchStatus() tea.Cmd {
 		branch := strings.TrimSpace(string(branchOut))
 
 		// Get status (use --no-optional-locks to avoid blocking during heavy writes)
+		// #nosec G204 -- fixed binary; repo path validated at config load
 		statusCmd := exec.Command("git", "-C", path, "--no-optional-locks", "status", "--porcelain")
 		statusOut, err := statusCmd.Output()
 		if err != nil {

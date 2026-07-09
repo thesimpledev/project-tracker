@@ -2,8 +2,10 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const appName = "project-tracker"
@@ -47,7 +49,7 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path is a fixed filename under the user config dir
 	if os.IsNotExist(err) {
 		return &Config{Repos: []Repo{}}, nil
 	}
@@ -60,7 +62,44 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	cfg.sanitizePaths()
 	return &cfg, nil
+}
+
+// ValidRepoPath returns the cleaned absolute form of path if it points at an
+// existing directory, or "" if it is not usable. All repo paths coming from
+// config files or user input must pass through here before being handed to
+// file operations or subprocesses.
+func ValidRepoPath(path string) string {
+	if path == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return ""
+	}
+	info, err := os.Stat(abs)
+	if err != nil || !info.IsDir() {
+		return ""
+	}
+	return abs
+}
+
+// sanitizePaths drops repo entries whose paths are missing or do not resolve
+// to an existing directory, so nothing downstream ever sees a bad path.
+func (c *Config) sanitizePaths() {
+	valid := c.Repos[:0]
+	for _, r := range c.Repos {
+		if p := ValidRepoPath(r.Path); p != "" {
+			r.Path = p
+			valid = append(valid, r)
+		}
+	}
+	c.Repos = valid
+
+	if c.LastOpenedDir != "" {
+		c.LastOpenedDir = ValidRepoPath(c.LastOpenedDir)
+	}
 }
 
 func (c *Config) Save() error {
@@ -69,7 +108,7 @@ func (c *Config) Save() error {
 		return err
 	}
 
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 
@@ -83,7 +122,7 @@ func (c *Config) Save() error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }
 
 func (c *Config) AddRepo(repo Repo) {
@@ -118,13 +157,26 @@ func profilesDir() (string, error) {
 	return filepath.Join(dir, "profiles"), nil
 }
 
+// validProfileName rejects names that could escape the profiles directory
+// (path separators, "..") or hide files (leading dot).
+func validProfileName(name string) error {
+	if name == "" || strings.ContainsAny(name, `/\`) || strings.Contains(name, "..") || strings.HasPrefix(name, ".") {
+		return fmt.Errorf("invalid profile name: %q", name)
+	}
+	return nil
+}
+
 func (c *Config) SaveProfile(name string) error {
+	if err := validProfileName(name); err != nil {
+		return err
+	}
+
 	dir, err := profilesDir()
 	if err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 
@@ -134,17 +186,21 @@ func (c *Config) SaveProfile(name string) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }
 
 func LoadProfile(name string) (*Config, error) {
+	if err := validProfileName(name); err != nil {
+		return nil, err
+	}
+
 	dir, err := profilesDir()
 	if err != nil {
 		return nil, err
 	}
 
 	path := filepath.Join(dir, name+".json")
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path is the config dir plus a validated profile name
 	if err != nil {
 		return nil, err
 	}
@@ -154,6 +210,7 @@ func LoadProfile(name string) (*Config, error) {
 		return nil, err
 	}
 
+	cfg.sanitizePaths()
 	return &cfg, nil
 }
 
