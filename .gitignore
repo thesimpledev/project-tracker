@@ -5,6 +5,9 @@
 # Test output
 test/
 
+# Generated audit report
+goaudit-report.json
+
 # IDE
 .idea/
 .vscode/
